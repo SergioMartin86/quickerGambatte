@@ -11,6 +11,7 @@ protectedTestSet = [
 # Tests for open source free roms (for public cloud testing)
 openSourceTestSet = [
   'airTrafficController.playaround',
+  'aslimetravel.playaround',
 ]
 
 # Creating test set based on whether copyrighted roms are to be used

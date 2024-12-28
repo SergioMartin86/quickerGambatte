@@ -1,6 +1,7 @@
 {
   "Rom File Path": "roms/Prince of Persia (USA, Europe).gbc",
   "Expected Rom SHA1": "EF2F6402E8EF367273200E3B07F310EBD80CCDC2",
+  "System Type": "Gameboy Color",
   "Initial State File": "",
   "Disable State Blocks": [ ],
   "Bios File Path": "roms/gbc_bios.bin",

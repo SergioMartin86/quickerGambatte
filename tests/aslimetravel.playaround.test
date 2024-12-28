@@ -1,6 +1,6 @@
 {
-  "Rom File Path": "roms/AirTrafficController.gbc",
-  "Expected Rom SHA1": "AC03AD5940D88507E19F54D7B4B963621176461F",
+  "Rom File Path": "roms/aslimetravel.gbc",
+  "Expected Rom SHA1": "A3C645C327F7EF04B23697F26D25E06ADDEF7925",
   "System Type": "Gameboy Color",
   "Initial State File": "",
   "Disable State Blocks": [ ],

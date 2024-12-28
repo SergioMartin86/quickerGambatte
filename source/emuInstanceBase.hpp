@@ -50,6 +50,7 @@ class EmuInstanceBase
     _emu =  new gambatte::GB();
     _romFilePath = jaffarCommon::json::getString(config, "Rom File Path");
     _biosFilePath = jaffarCommon::json::getString(config, "Bios File Path");
+    _systemType = jaffarCommon::json::getString(config, "System Type");
     _inputParser = std::make_unique<jaffar::InputParser>(config);
   }
 
@@ -85,6 +86,16 @@ class EmuInstanceBase
 
   void initialize()
   {
+    // Rom loading flags
+    int romLoadFlags = 0;
+
+    // Getting system type
+    bool systemTypeRecognized = false;
+    if (_systemType == "Gameboy") { systemTypeRecognized = true; }
+    if (_systemType == "Gameboy Color") { romLoadFlags |= gambatte::GB::LoadFlag::CGB_MODE; systemTypeRecognized = true; }
+    if (_systemType == "Gameboy Advance") { romLoadFlags |= gambatte::GB::LoadFlag::GBA_FLAG; systemTypeRecognized = true; }
+    if (systemTypeRecognized == false) JAFFAR_THROW_LOGIC("Could not recognize system type: %s\n", _systemType.c_str());
+
     // Set input getter
     _emu->setInputGetter(InputGetter, &_inputValue);
 
@@ -94,7 +105,6 @@ class EmuInstanceBase
     if (status == false) JAFFAR_THROW_LOGIC("Could not find/read from Rom file: %s\n", _romFilePath.c_str());
 
     // Reading from Bios file, if defined
-    int romLoadFlags = 0;
     if (_biosFilePath != "")
     {
       std::string biosFileData;
@@ -279,6 +289,8 @@ class EmuInstanceBase
   private:
 
   static uint32_t InputGetter(void* inputValue) { return *(uint32_t*)inputValue; }
+
+  std::string _systemType;
 
   gambatte::GB* _emu;
   MemoryAreas _memoryAreas;
