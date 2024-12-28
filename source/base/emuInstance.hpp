@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../mgbaInstanceBase.hpp"
+#include "../emuInstanceBase.hpp"
 #include <string>
 #include <vector>
 #include <jaffarCommon/exceptions.hpp>
@@ -22,8 +22,6 @@ class EmuInstance : public EmuInstanceBase
   ~EmuInstance()
   {
   }
-
-  inline size_t getDifferentialStateSizeImpl() const override { return 0; }
 
   void setWorkRamSerializationSizeImpl(const size_t size) override
   {
@@ -57,7 +55,6 @@ class EmuInstance : public EmuInstanceBase
 
 
   private:
-
 
 };
 

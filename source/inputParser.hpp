@@ -12,7 +12,7 @@
 namespace jaffar
 {
 
-enum GBAKey {
+enum GBKey {
 	GBA_KEY_A = 1,
 	GBA_KEY_B = 2,
 	GBA_KEY_SELECT = 4,
@@ -20,7 +20,7 @@ enum GBAKey {
 	GBA_KEY_RIGHT = 16,
 	GBA_KEY_LEFT = 32,
 	GBA_KEY_UP = 64,
-	GBA_KEY_DOWN = 128,
+	GBA_KEY_DOWN = 128
 };
 
 typedef uint16_t port_t;
@@ -35,7 +35,7 @@ class InputParser
 {
 public:
 
-  enum controller_t { none, gb, gbc, gba };
+  enum controller_t { none, gb };
 
   InputParser(const nlohmann::json &config)
   {
@@ -44,8 +44,8 @@ public:
       bool isTypeRecognized = false;
 
       const auto controllerType = jaffarCommon::json::getString(config, "Controller Type");
-      if (controllerType == "None")            { _controllerType = controller_t::none; isTypeRecognized = true; }
-      if (controllerType == "Gameboy Advance") { _controllerType = controller_t::gba;  isTypeRecognized = true; }
+      if (controllerType == "None")    { _controllerType = controller_t::none; isTypeRecognized = true; }
+      if (controllerType == "Gameboy") { _controllerType = controller_t::gb;  isTypeRecognized = true; }
       
       if (isTypeRecognized == false) JAFFAR_THROW_LOGIC("Controller type not recognized: '%s'\n", controllerType.c_str()); 
    }
@@ -67,7 +67,7 @@ public:
     if (c != '|') reportBadInputString(inputString, c);
     
     // Parsing controller inputs
-    if (_controllerType == controller_t::gba) parseGBAInput(input.port, input.power, ss, inputString);
+    if (_controllerType == controller_t::gb) parseGBAInput(input.port, input.power, ss, inputString);
 
     // End separator
     c = ss.get();
@@ -90,9 +90,6 @@ public:
 
     // Cleaning code
     code = 0;
-
-    // Ignoring analog inputs
-    ss.seekg(24, std::ios_base::cur);
 
     // Up
     c = ss.get();
@@ -133,16 +130,6 @@ public:
     c = ss.get();
     if (c != '.' && c != 'A') reportBadInputString(inputString, c);
     if (c == 'A') code |= GBA_KEY_A;
-
-    // l
-    c = ss.get();
-    if (c != '.' && c != 'l') reportBadInputString(inputString, c);
-    if (c == 'l') code |= GBA_KEY_L;
-
-    // r
-    c = ss.get();
-    if (c != '.' && c != 'r') reportBadInputString(inputString, c);
-    if (c == 'r') code |= GBA_KEY_R;
 
     // P
     power = false;

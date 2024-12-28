@@ -3,4 +3,4 @@
 	url = https://github.com/SergioMartin86/jaffarCommon.git
 [submodule "source/base/core"]
 	path = source/base/core
-	url = https://github.com/SergioMartin86/mgba.git
+	url = https://github.com/pokemon-speedrunning/gambatte-core.git

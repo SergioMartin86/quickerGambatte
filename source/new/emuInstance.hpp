@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../mgbaInstanceBase.hpp"
+#include "../emuInstanceBase.hpp"
 #include <string>
 #include <vector>
 #include <jaffarCommon/exceptions.hpp>
@@ -15,15 +15,13 @@ class EmuInstance : public EmuInstanceBase
 {
  public:
 
- EmuInstance(const nlohmann::json &config) : EmuInstanceBase(config)
- {
- }
+  EmuInstance(const nlohmann::json &config) : EmuInstanceBase(config)
+  {
+  }
 
- ~EmuInstance()
- {
- }
-
-  inline size_t getDifferentialStateSizeImpl() const override { return 0; }
+  ~EmuInstance()
+  {
+  }
 
   void setWorkRamSerializationSizeImpl(const size_t size) override
   {
@@ -53,10 +51,10 @@ class EmuInstance : public EmuInstanceBase
   {
   }
 
-  std::string getCoreName() const override { return "QuickerGambatte"; }
+  std::string getCoreName() const override { return "Quicker Gambatte"; }
+
 
   private:
-
 
 };
 

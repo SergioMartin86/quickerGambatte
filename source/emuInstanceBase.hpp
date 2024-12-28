@@ -10,46 +10,33 @@
 #include <jaffarCommon/deserializers/contiguous.hpp>
 #include "inputParser.hpp"
 #include <SDL.h>
-// #include <mgba-util/vfs.h>
+#include <gambatte.h>
 
 struct MemoryAreas 
 {
-	void* bios;
-	void* wram;
-	void* iwram;
-	void* mmio;
-	void* palram;
 	void* vram;
-	void* oam;
 	void* rom;
-	void* sram;
+	void* wram;
+  void* cartram;
+  void* oam;
+  void* hram;
 };
 
 struct MemorySizes
 {
-	size_t bios;
-	size_t wram;
-	size_t iwram;
-	size_t mmio;
-	size_t palram;
-	size_t vram;
-	size_t oam;
-	size_t rom;
-	size_t sram;
+	int vram;
+	int rom;
+	int wram;
+  int cartram;
+  int oam;
+  int hram;
 };
 
-// extern "C" {
-//  void* BizCreate(const void* bios, const void* data, uint32_t length, bool skipbios);
-//  bool BizStartGetState(void* ctx, struct VFile** file, uint32_t* size);
-//  void BizFinishGetState(struct VFile* file, void* data, uint32_t size);
-//  bool BizPutState(void* ctx, const void* data, uint32_t size);
-//  bool BizAdvance(void* ctx, uint16_t keys, int64_t time, int16_t gyrox, int16_t gyroy, int16_t gyroz, uint8_t luma, uint32_t* videoBuffer);
-//  void BizGetMemoryAreas(void* ctx, struct MemoryAreas* dst);
-//  void BizGetMemorySizes(void* ctx, struct MemorySizes* dst);
-// }
+#define GB_VIDEO_HORIZONTAL_PIXELS 160
+#define	GB_VIDEO_VERTICAL_PIXELS 144
 
-#define GBA_VIDEO_HORIZONTAL_PIXELS 240
-#define	GBA_VIDEO_VERTICAL_PIXELS 160
+#define _AUDIO_SAMPLE_COUNT 35112
+#define _AUDIO_EXTRA_SAMPLE_COUNT 2064
 
 namespace jaffar
 {
@@ -60,6 +47,7 @@ class EmuInstanceBase
 
   EmuInstanceBase(const nlohmann::json &config)
   {
+    _emu =  new gambatte::GB();
     _romFilePath = jaffarCommon::json::getString(config, "Rom File Path");
     _biosFilePath = jaffarCommon::json::getString(config, "Bios File Path");
     _inputParser = std::make_unique<jaffar::InputParser>(config);
@@ -71,13 +59,15 @@ class EmuInstanceBase
   {
     if (input.power) JAFFAR_THROW_RUNTIME("Power button pressed, but not supported");
 
-    int64_t time = 1729787535;
-    time += (_emulationStep * 4389L) >> 18;
+    // Setting input
+    _inputValue = input.port;
 
-    // if (_renderingEnabled == true) BizAdvance(_emu, input.port, time, 0, 0, 0, 255, _videoBuffer);
-    // if (_renderingEnabled == false) BizAdvance(_emu, input.port, time, 0, 0, 0, 255, NULL);
-
-    _emulationStep++;
+    size_t samples = _AUDIO_SAMPLE_COUNT;
+    if (_renderingEnabled == true)  _emu->runFor(_videoBuffer, GB_VIDEO_HORIZONTAL_PIXELS, _audioBuffer, samples);
+    if (_renderingEnabled == false) _emu->runFor(nullptr, 0, _audioBuffer, samples); 
+    
+    // if (status < 0) JAFFAR_THROW_LOGIC("Could not advance state");
+    // printf("Status: %d\n", status);
   }
 
   inline jaffarCommon::hash::hash_t getStateHash() const
@@ -85,9 +75,8 @@ class EmuInstanceBase
     MetroHash128 hash;
     
     //  Getting RAM pointer and size
-    // hash.Update(_memoryAreas.wram, _memorySizes.wram);
-    // hash.Update(_memoryAreas.iwram, _memorySizes.iwram);
-    // hash.Update(getVideoBufferPtr(), getVideoBufferSize());
+    //hash.Update(_memoryAreas.wram, _memorySizes.wram);
+    hash.Update(_memoryAreas.vram, _memorySizes.vram);
 
     jaffarCommon::hash::hash_t result;
     hash.Finalize(reinterpret_cast<uint8_t *>(&result));
@@ -96,43 +85,96 @@ class EmuInstanceBase
 
   void initialize()
   {
+    // Set input getter
+    _emu->setInputGetter(InputGetter, &_inputValue);
+
     // Reading from Rom file
     std::string romFileData;
     bool        status = jaffarCommon::file::loadStringFromFile(romFileData, _romFilePath.c_str());
     if (status == false) JAFFAR_THROW_LOGIC("Could not find/read from Rom file: %s\n", _romFilePath.c_str());
 
     // Reading from Bios file, if defined
-    std::string biosFileData;
-    void* biosFileDataPtr = nullptr;
-    bool skipBios = true;
+    int romLoadFlags = 0;
     if (_biosFilePath != "")
     {
+      std::string biosFileData;
       bool        status = jaffarCommon::file::loadStringFromFile(biosFileData, _biosFilePath.c_str());
       if (status == false) JAFFAR_THROW_LOGIC("Could not find/read from BIOS file: %s\n", _biosFilePath.c_str());
-      biosFileDataPtr = biosFileData.data();
-      skipBios = false;
+
+      // Loading bios
+      {
+        int status = _emu->loadBios(biosFileData.data(), biosFileData.size());
+      if (status != 0) JAFFAR_THROW_LOGIC("Could not load BIOS file: '%s' into the emulator\n", _biosFilePath.c_str());
+      }
+    }
+    // If bios not loaded, indicate that to the emu
+    else
+    {
+      romLoadFlags |= gambatte::GB::LoadFlag::NO_BIOS;
     }
 
-    // _emu = BizCreate(biosFileDataPtr, romFileData.data(), romFileData.size(), skipBios);
-    
-    // _emuStateSize = getEmulatorStateSize();
-    // _stateSize = _emuStateSize + sizeof(_emulationStep);
+    // Load rom file
+    {
+      int status = _emu->load(romFileData.c_str(), romFileData.length(), romLoadFlags);
+      if (status != 0) JAFFAR_THROW_LOGIC("Could not load Rom file: '%s' into the emulator\n", _romFilePath.c_str());
+    }
 
+    _stateSize = getEmulatorStateSize();
+    // printf("State Size: %lu\n", _stateSize);
     _dummyStateData = (uint8_t*) malloc(_stateSize);
 
-    _videoBufferSize = GBA_VIDEO_HORIZONTAL_PIXELS * GBA_VIDEO_VERTICAL_PIXELS * sizeof(uint32_t);
+    _videoBufferSize = GB_VIDEO_HORIZONTAL_PIXELS * GB_VIDEO_VERTICAL_PIXELS * sizeof(uint32_t);
     _videoBuffer = (uint32_t*) malloc (_videoBufferSize);
+    _audioBuffer = (gambatte::uint_least32_t*) malloc (sizeof(gambatte::uint_least32_t) * (_AUDIO_SAMPLE_COUNT + _AUDIO_EXTRA_SAMPLE_COUNT));
 
-    // BizGetMemoryAreas(_emu, &_memoryAreas);
-    // BizGetMemorySizes(_emu, &_memorySizes);
+    // printf("Game Title: %s\n", _emu->romTitle().c_str());
+
+    //// Getting memory areas
+    /** 0 = vram, 1 = rom, 2 = wram, 3 = cartram, 4 = oam, 5 = hram */
+
+    // VRAM
+    {
+     bool status = _emu->getMemoryArea(0, (unsigned char**)&_memoryAreas.vram, &_memorySizes.vram);
+     if (status == false) JAFFAR_THROW_LOGIC("Could not get memory area: 'vram' from the emulator\n");
+    }
+
+    // ROM
+    {
+     bool status = _emu->getMemoryArea(1, (unsigned char**)&_memoryAreas.rom, &_memorySizes.rom);
+     if (status == false) JAFFAR_THROW_LOGIC("Could not get memory area: 'rom' from the emulator\n");
+    }
+
+    // WRAM
+    {
+     bool status = _emu->getMemoryArea(2, (unsigned char**)&_memoryAreas.wram, &_memorySizes.wram);
+     if (status == false) JAFFAR_THROW_LOGIC("Could not get memory area: 'wram' from the emulator\n");
+    }
+
+    // CARTRAM
+    {
+     bool status = _emu->getMemoryArea(3, (unsigned char**)&_memoryAreas.cartram, &_memorySizes.cartram);
+     if (status == false) JAFFAR_THROW_LOGIC("Could not get memory area: 'cartram' from the emulator\n");
+    }
+
+    // OAM
+    {
+     bool status = _emu->getMemoryArea(4, (unsigned char**)&_memoryAreas.oam, &_memorySizes.oam);
+     if (status == false) JAFFAR_THROW_LOGIC("Could not get memory area: 'oam' from the emulator\n");
+    }
+
+    // HRAM
+    {
+     bool status = _emu->getMemoryArea(5, (unsigned char**)&_memoryAreas.hram, &_memorySizes.hram);
+     if (status == false) JAFFAR_THROW_LOGIC("Could not get memory area: 'hram' from the emulator\n");
+    }
   }
 
   void initializeVideoOutput()
   {
     SDL_Init(SDL_INIT_VIDEO);
-    _renderWindow = SDL_CreateWindow("QuickerMGBA",  SDL_WINDOWPOS_UNDEFINED,  SDL_WINDOWPOS_UNDEFINED, GBA_VIDEO_HORIZONTAL_PIXELS, GBA_VIDEO_VERTICAL_PIXELS, 0);
+    _renderWindow = SDL_CreateWindow("QuickerMGBA",  SDL_WINDOWPOS_UNDEFINED,  SDL_WINDOWPOS_UNDEFINED, GB_VIDEO_HORIZONTAL_PIXELS, GB_VIDEO_VERTICAL_PIXELS, 0);
     _renderer = SDL_CreateRenderer(_renderWindow, -1, SDL_RENDERER_ACCELERATED);
-    _texture = SDL_CreateTexture(_renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, GBA_VIDEO_HORIZONTAL_PIXELS, GBA_VIDEO_VERTICAL_PIXELS);
+    _texture = SDL_CreateTexture(_renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, GB_VIDEO_HORIZONTAL_PIXELS, GB_VIDEO_VERTICAL_PIXELS);
   }
 
   void finalizeVideoOutput()
@@ -158,12 +200,12 @@ class EmuInstanceBase
     void *pixels = nullptr;
     int pitch = 0;
 
-    SDL_Rect srcRect  = { 0, 0, GBA_VIDEO_HORIZONTAL_PIXELS, GBA_VIDEO_VERTICAL_PIXELS };
-    SDL_Rect destRect = { 0, 0, GBA_VIDEO_HORIZONTAL_PIXELS, GBA_VIDEO_VERTICAL_PIXELS };
+    SDL_Rect srcRect  = { 0, 0, GB_VIDEO_HORIZONTAL_PIXELS, GB_VIDEO_VERTICAL_PIXELS };
+    SDL_Rect destRect = { 0, 0, GB_VIDEO_HORIZONTAL_PIXELS, GB_VIDEO_VERTICAL_PIXELS };
 
     if (SDL_LockTexture(_texture, nullptr, &pixels, &pitch) < 0) return;
-    memcpy(pixels, _videoBuffer, sizeof(uint32_t) * GBA_VIDEO_VERTICAL_PIXELS * GBA_VIDEO_HORIZONTAL_PIXELS);
-    // memset(pixels, (32 << 24) + (32 << 16) + (32 << 8) + 32, sizeof(uint32_t) * GBA_VIDEO_VERTICAL_PIXELS * GBA_VIDEO_HORIZONTAL_PIXELS);
+    memcpy(pixels, _videoBuffer, sizeof(uint32_t) * GB_VIDEO_VERTICAL_PIXELS * GB_VIDEO_HORIZONTAL_PIXELS);
+    // memset(pixels, (32 << 24) + (32 << 16) + (32 << 8) + 32, sizeof(uint32_t) * GB_VIDEO_VERTICAL_PIXELS * GB_VIDEO_HORIZONTAL_PIXELS);
     SDL_UnlockTexture(_texture);
     SDL_RenderClear(_renderer);
     SDL_RenderCopy(_renderer, _texture, &srcRect, &destRect);
@@ -172,34 +214,24 @@ class EmuInstanceBase
 
   size_t getEmulatorStateSize()
   {
-    VFile* vf;
-    uint32_t size; 
-    // BizStartGetState(_emu, &vf, &size);
-    return (size_t) size;
+    return (size_t)_emu->saveState(nullptr, 0, nullptr);
   }
 
   void enableStateBlock(const std::string& block) 
   {
     enableStateBlockImpl(block);
-    _emuStateSize = getEmulatorStateSize();
-    _stateSize = _emuStateSize + sizeof(_emulationStep);
-    _differentialStateSize = getDifferentialStateSizeImpl();
   }
 
   void disableStateBlock(const std::string& block)
   {
      disableStateBlockImpl(block);
-    _emuStateSize = getEmulatorStateSize();
-    _stateSize = _emuStateSize + sizeof(_emulationStep);
-    _differentialStateSize = getDifferentialStateSizeImpl();
+    _stateSize = getEmulatorStateSize();
   }
 
   virtual void setWorkRamSerializationSize(const size_t size)
   {
     setWorkRamSerializationSizeImpl(size);
-    _emuStateSize = getEmulatorStateSize();
-    _stateSize = _emuStateSize + sizeof(_emulationStep);
-    _differentialStateSize = getDifferentialStateSizeImpl();
+    _stateSize = getEmulatorStateSize();
   }
 
   inline size_t getStateSize() const 
@@ -207,28 +239,19 @@ class EmuInstanceBase
     return _stateSize;
   }
 
-  inline size_t getDifferentialStateSize() const
-  {
-    return _differentialStateSize;
-  }
-  
   inline jaffar::InputParser *getInputParser() const { return _inputParser.get(); }
   
   void serializeState(jaffarCommon::serializer::Base& s) const
   {
-    VFile* vf;
-    uint32_t size; 
-    // BizStartGetState(_emu, &vf, &size);
-    // BizFinishGetState(vf, _dummyStateData, _emuStateSize);
-    s.push(_dummyStateData, _emuStateSize);
-    s.push(&_emulationStep, sizeof(_emulationStep));
+    // VFile* vf;
+    _emu->saveState(nullptr, 0, (char*)_dummyStateData);
+    s.push(_dummyStateData, _stateSize);
   }
 
   void deserializeState(jaffarCommon::deserializer::Base& d) 
   {
-    d.pop(_dummyStateData, _emuStateSize);
-    // BizPutState(_emu, _dummyStateData, _emuStateSize);
-    d.pop(&_emulationStep, sizeof(_emulationStep));
+    d.pop(_dummyStateData, _stateSize);
+    _emu->loadState((char*)_dummyStateData, _stateSize);
   }
 
   size_t getVideoBufferSize() const { return _videoBufferSize; }
@@ -249,15 +272,15 @@ class EmuInstanceBase
   virtual void setWorkRamSerializationSizeImpl(const size_t size) {};
   virtual void enableStateBlockImpl(const std::string& block) {};
   virtual void disableStateBlockImpl(const std::string& block) {};
-  virtual size_t getDifferentialStateSizeImpl() const = 0;
 
   // State size
-  size_t _emuStateSize;
   size_t _stateSize;
 
   private:
 
-  void* _emu;
+  static uint32_t InputGetter(void* inputValue) { return *(uint32_t*)inputValue; }
+
+  gambatte::GB* _emu;
   MemoryAreas _memoryAreas;
   MemorySizes _memorySizes;
 
@@ -266,10 +289,8 @@ class EmuInstanceBase
   std::string _romFilePath;
   std::string _biosFilePath;
 
-  // Differential state size
-  size_t _differentialStateSize;
-
   // Input parser instance
+  uint32_t _inputValue;
   std::unique_ptr<jaffar::InputParser> _inputParser;
 
   // Rendering stuff
@@ -279,10 +300,7 @@ class EmuInstanceBase
   uint32_t* _videoBuffer;
   size_t _videoBufferSize;
   bool _renderingEnabled = false;
-
-  // current emulation step
-  size_t _emulationStep = 0;
-
+  gambatte::uint_least32_t* _audioBuffer;
 };
 
 } // namespace jaffar

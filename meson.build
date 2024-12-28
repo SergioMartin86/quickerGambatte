@@ -1,4 +1,4 @@
-project('quickerMGBA','c','cpp',
+project('quickerGambatte','c','cpp',
   version: '1.0.0',
   default_options : ['cpp_std=c++20', 'default_library=shared', 'buildtype=release'],
   subproject_dir : 'extern'
@@ -22,20 +22,20 @@ jaffarCommonDependency = jaffarCommonSubproject.get_variable('jaffarCommonDepend
 
 if get_option('buildPlayer') == true
 
-  newMGBAPlayer = executable('newMGBAPlayer',
+  newPlayer = executable('newPlayer',
     'source/player.cpp',
     cpp_args            : [ commonCompileArgs, '-DNCURSES' ],
-    dependencies        : [ newMGBADependency,
+    dependencies        : [ newDependency,
                             jaffarCommonDependency
                           ],
     include_directories : include_directories(['source']),
     link_args           : [ '-lncurses' ],
   )
 
-  baseMGBAPlayer = executable('baseMGBAPlayer',
+  basePlayer = executable('basePlayer',
     'source/player.cpp',
     cpp_args            : [ commonCompileArgs, '-DNCURSES' ],
-    dependencies        : [ baseMGBADependency,
+    dependencies        : [ baseDependency,
                             jaffarCommonDependency,
                           ],
     include_directories : include_directories(['source']),
@@ -46,18 +46,18 @@ endif
 
 # Building tester tool
 
-newMGBATester = executable('newMGBATester',
+newTester = executable('newTester',
   'source/tester.cpp',
   cpp_args            : [ commonCompileArgs ], 
-  dependencies        : [ newMGBADependency, jaffarCommonDependency ],
+  dependencies        : [ newDependency, jaffarCommonDependency ],
 )
 
 # Building tester tool for the original emulator
 
-baseMGBATester = executable('baseMGBATester',
+baseTester = executable('baseTester',
   'source/tester.cpp',
   cpp_args            : [ commonCompileArgs ],
-  dependencies        : [ baseMGBADependency, jaffarCommonDependency ],
+  dependencies        : [ baseDependency, jaffarCommonDependency ],
 )
 
 # Building tests

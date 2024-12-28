@@ -1,0 +1,8 @@
+{
+  "Rom File Path": "roms/AirTrafficController.gbc",
+  "Expected Rom SHA1": "AC03AD5940D88507E19F54D7B4B963621176461F",
+  "Initial State File": "",
+  "Disable State Blocks": [ ],
+  "Bios File Path": "",
+  "Controller Type": "Gameboy"
+}
