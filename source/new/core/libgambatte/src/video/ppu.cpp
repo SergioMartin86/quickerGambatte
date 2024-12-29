@@ -661,6 +661,7 @@ void doFullTilesUnrolledDmg(PPUPriv &p, int const xend, uint_least32_t *const db
 
 void doFullTilesUnrolledCgb(PPUPriv &p, int const xend, uint_least32_t *const dbufline,
 		unsigned char const *const tileMapLine, unsigned const tileline, unsigned tileMapXpos) {
+			
 	int const tileIndexSign = p.lcdc & lcdc_tdsel ? 0 : tile_pattern_table_size / tile_size / 2;
 	unsigned char const *const tileDataLine = p.vram + 2 * tile_size * tileIndexSign
 		+ tileline * tile_line_size;

@@ -86,6 +86,9 @@ class EmuInstanceBase
 
   void initialize()
   {
+    // Setting speedup flag
+    _emu->setSpeedupFlags(gambatte::GB::SpeedupFlag::NO_SOUND);
+
     // Rom loading flags
     int romLoadFlags = 0;
 
@@ -198,11 +201,13 @@ class EmuInstanceBase
   void enableRendering()
   {
     _renderingEnabled = true;
+    _emu->setSpeedupFlags(gambatte::GB::SpeedupFlag::NO_SOUND);
   }
 
   void disableRendering()
   {
     _renderingEnabled = false;
+    _emu->setSpeedupFlags(gambatte::GB::SpeedupFlag::NO_SOUND | gambatte::GB::SpeedupFlag::NO_VIDEO);
   }
 
   void updateRenderer()

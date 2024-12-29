@@ -73,7 +73,9 @@ quickerGambatteIncludeDirs = [
 ]
 
 quickerGambatteCompileArgs = [
-	  '-DHAVE_STDINT_H'
+	  '-DHAVE_STDINT_H',
+			'-Wno-deprecated-enum-enum-conversion',
+			'-Wno-deprecated-declarations'
 
 ]
 
