@@ -207,7 +207,7 @@ class EmuInstanceBase
   void disableRendering()
   {
     _renderingEnabled = false;
-    _emu->setSpeedupFlags(gambatte::GB::SpeedupFlag::NO_SOUND | gambatte::GB::SpeedupFlag::NO_VIDEO);
+    _emu->setSpeedupFlags(gambatte::GB::SpeedupFlag::NO_SOUND | gambatte::GB::SpeedupFlag::NO_VIDEO | gambatte::GB::SpeedupFlag::NO_PPU_CALL);
   }
 
   void updateRenderer()
